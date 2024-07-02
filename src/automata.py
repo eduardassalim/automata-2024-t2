@@ -93,3 +93,56 @@ def process(automata, words):
         raise ErroException(f"Erro ao processar palavra '{word}': {e}.") from e
 
     return verifica
+
+
+def convert_to_dfa(automata):
+    """Aqui crio a função."""
+
+    alfabeto, estados, transicao, estado_inicial, estados_finais = automata
+
+    if all(len(transicao[estado].keys()) == len(alfabeto) for estado in estados):
+        return automata
+
+    estado_novo = set()
+    nova_transicao = {}
+
+    def movimentos(estado):
+        movimento = set()
+        pilha = [estado]
+        while pilha:
+            s = pilha.pop()
+            movimento.add(s)
+            for dest in transicao[s].get('&', []):
+                if dest not in movimento:
+                    pilha.append(dest)
+        return movimento
+
+    movimento_inicial = movimentos(estado_inicial)
+    estado_novo.add(tuple(sorted(movimento_inicial)))
+    nova_transicao[tuple(sorted(movimento_inicial))] = {}
+
+    estados_a_processar = [tuple(sorted(movimento_inicial))]
+    while estados_a_processar:
+        novo_estado = estados_a_processar.pop(0)
+        for simbolo in alfabeto:
+            destino = set()
+            for estado in novo_estado:
+                for dest in transicao.get(estado, {}).get(simbolo, []):
+                    destino.update(movimentos(dest))
+            if destino:
+                novo_destino = tuple(sorted(destino))
+                if novo_destino not in estado_novo:
+                    estado_novo.add(novo_destino)
+                    nova_transicao[novo_destino] = {}
+                    estados_a_processar.append(novo_destino)
+                nova_transicao[novo_estado][simbolo] = novo_destino
+
+    novo_estados_finais = set()
+    for estado in estado_novo:
+        if any(e in estados_finais for e in estado):
+            novo_estados_finais.add(estado)
+
+    novo_automato = (alfabeto, list(estado_novo), nova_transicao, tuple(
+        sorted(movimento_inicial)), list(novo_estados_finais))
+
+    return novo_automato

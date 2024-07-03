@@ -97,7 +97,6 @@ def process(automata, words):
 
 def convert_to_dfa(automata):
     """Aqui crio a função."""
-
     alfabeto, estados, transicao, estado_inicial, estados_finais = automata
 
     if all(len(transicao[estado].keys()) == len(alfabeto) for estado in estados):

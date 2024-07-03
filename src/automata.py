@@ -103,10 +103,7 @@ def convert_to_dfa(automata):
     if all(len(transicao[estado].keys()) == len(alfabeto) for estado in estados):
         return automata
 
-    estado_novo = set()
-    nova_transicao = {}
-
-    def movimentos(estado):
+    def move(estado):
         movimento = set()
         pilha = [estado]
         while pilha:
@@ -117,32 +114,45 @@ def convert_to_dfa(automata):
                     pilha.append(dest)
         return movimento
 
-    movimento_inicial = movimentos(estado_inicial)
-    estado_novo.add(tuple(sorted(movimento_inicial)))
-    nova_transicao[tuple(sorted(movimento_inicial))] = {}
+    nfa_para_dfa = {}
 
-    estados_a_processar = [tuple(sorted(movimento_inicial))]
-    while estados_a_processar:
-        novo_estado = estados_a_processar.pop(0)
+    def estados_alcancaveis(estado_nfa):
+        alcanca = set()
+        for estado in estado_nfa:
+            for dest in transicao.get(estado, {}).keys():
+                if dest != '&':
+                    alcanca.add(dest)
+                    alcanca.update(transicao[estado].get(dest, []))
+        return tuple(sorted(alcanca))
+
+    movimento_inicial = move(estado_inicial)
+    nfa_para_dfa[movimento_inicial] = {}
+    estados_dfa = [movimento_inicial]
+
+    fila = [movimento_inicial]
+    while fila:
+        estado_dfa = fila.pop(0)
         for simbolo in alfabeto:
-            destino = set()
-            for estado in novo_estado:
-                for dest in transicao.get(estado, {}).get(simbolo, []):
-                    destino.update(movimentos(dest))
-            if destino:
-                novo_destino = tuple(sorted(destino))
-                if novo_destino not in estado_novo:
-                    estado_novo.add(novo_destino)
-                    nova_transicao[novo_destino] = {}
-                    estados_a_processar.append(novo_destino)
-                nova_transicao[novo_estado][simbolo] = novo_destino
+            if simbolo == '&':
+                continue
+            novo_estado_nfa = set()
+            for estado_nfa in estado_dfa:
+                if simbolo in transicao.get(estado_nfa, {}):
+                    novo_estado_nfa.update(transicao[estado_nfa][simbolo])
+            novo_estado_nfa_fecho = move(tuple(sorted(novo_estado_nfa)))
+            if novo_estado_nfa_fecho not in nfa_para_dfa:
+                nfa_para_dfa[novo_estado_nfa_fecho] = {}
+                estados_dfa.append(novo_estado_nfa_fecho)
+                fila.append(novo_estado_nfa_fecho)
+            nfa_para_dfa[estado_dfa][simbolo] = novo_estado_nfa_fecho
 
-    novo_estados_finais = set()
-    for estado in estado_novo:
-        if any(e in estados_finais for e in estado):
-            novo_estados_finais.add(estado)
+    estados_finais_dfa = []
+    for estado_dfa in estados_dfa:
+        for estado_nfa in estado_dfa:
+            if estado_nfa in estados_finais:
+                estados_finais_dfa.append(estado_dfa)
+                break
 
-    novo_automato = (alfabeto, list(estado_novo), nova_transicao, tuple(
-        sorted(movimento_inicial)), list(novo_estados_finais))
+    novo_automato = (alfabeto, estados_dfa, nfa_para_dfa, movimento_inicial, estados_finais_dfa)
 
     return novo_automato

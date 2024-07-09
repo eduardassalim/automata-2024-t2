@@ -1,3 +1,5 @@
+"""processa"""
+
 from typing import Set, Dict, Tuple, List, Union
 
 
@@ -67,6 +69,9 @@ def process(
     automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]],
     words: List[str]
 ) -> Dict[str, str]:
+    """
+    Processa automato.
+    """
 
     _, sigma, _, _, _ = automata
     dfa = convert_to_dfa(automata)
@@ -83,12 +88,14 @@ def process(
                     verifica[word] = "INVALIDA"
                     verificacao = False
                     break
+
                 if (estado_atual, simbolo) in dfa_transicao:
                     estado_atual = dfa_transicao[(estado_atual, simbolo)]
                 else:
                     verifica[word] = "REJEITA"
                     verificacao = False
                     break
+
             if verificacao:
                 if estado_atual in dfa_final:
                     verifica[word] = "ACEITA"
@@ -104,6 +111,9 @@ def process(
 def epsilon_closure(
     estado: str, transicao: Dict[Tuple[str, str], Union[str, List[str]]]
 ) -> Set[str]:
+    """
+    Process epsilon_closure.
+    """
 
     closure = {estado}
     pilha = [estado]
@@ -124,6 +134,9 @@ def epsilon_closure(
 def convert_to_dfa(
     automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]]
 ) -> Tuple[Set[str], Set[str], Dict[Tuple[str, str], str], str, Set[str]]:
+    """
+    Processa conversão.
+    """
 
     _, sigma, dfa_transicao, dfa_inicial, dfa_final = automata
 

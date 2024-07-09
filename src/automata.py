@@ -1,160 +1,177 @@
-import os
+"""Processa."""
+
 from typing import Set, Dict, Tuple, List, Union
 
+
+class ErroException(Exception):
+    """Aqui crio uma exceção personalizada.
+
+    Args:
+        mensagem (str): descrição do erro encontrado.
+    """
+
+    def __init__(self, mensagem):
+        """Aqui inicializa a exceção.
+
+        Args:
+            mensagem (str): Mensagem do erro.
+        """
+        self.mensagem = mensagem
+        super().__init__(self.mensagem)
+
+
 def load_automata(filename: str) -> Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]]:
-
+    """Aqui carrega um autômato a partir de um arquivo."""
     try:
-        with open(filename, 'r') as file:
-            lines = file.read().splitlines()
+        with open(filename, encoding='utf-8') as arquivo:
+            linhas = arquivo.readlines()
 
-        if len(lines) < 5:
-            raise ValueError("Descrição incompleta do autômato.")
+        if len(linhas) < 5:
+            raise ErroException("Arquivo não é autômato.")
 
-        linhaAlfabeto  = set(lines[0].split())  # Símbolos do alfabeto
-        linhaEstados  = set(lines[1].split())  # Estados
-        linhaEstadoFinal  = set(lines[2].split())  # Estados finais
-        linhaEstadoInicial = lines[3]  # Estado inicial
+        alfabeto = linhas[0].strip().split()
+        estados = linhas[1].strip().split()
+        estados_finais = linhas[2].strip().split()
+        estado_inicial = linhas[3].strip()
 
-        if linhaEstadoInicial not in linhaEstados :
-            raise ValueError("Estado inicial não está no conjunto de estados.")
+        if estado_inicial not in estados:
+            raise ErroException("Estado inicial não está dentro de estados.")
 
-        if not linhaEstadoFinal .issubset(linhaEstados ):
-            raise ValueError("Estados finais não estão no conjunto de estados.")
+        if not estados_finais .issubset(estados):
+            raise ErroException("Estado final não está dentro de estados.")
 
-        delta = {}  
+        transicoes = {}
 
-        for rule in lines[4:]:
-            parts = rule.split()
-            if len(parts) != 3:
-                raise ValueError("Formato inválido da regra de transição.")
-            origin, symbol, destination = parts
-            if origin not in linhaEstados  or (symbol not in linhaAlfabeto  and symbol != '&') or destination not in linhaEstados :
-                raise ValueError("Componentes da regra inválidos.")
-            if (origin, symbol) not in delta:
-                delta[(origin, symbol)] = destination
+        for regra in linhas[4:]:
+            nodo = regra.split()
+            if len(nodo) != 3:
+                raise ErroException("Transição inválida.")
+
+            origem, simbolo, destino = nodo
+
+            if origem not in estados or simbolo not in alfabeto and simbolo != '&' or destino not in estados:
+                raise ErroException("Símbolos inválidos.")
+
+            if (origem, simbolo) not in transicoes:
+                transicoes[(origem, simbolo)] = destino
             else:
-                if isinstance(delta[(origin, symbol)], list):
-                    delta[(origin, symbol)].append(destination)
+                if isinstance(transicoes[(origem, simbolo)], list):
+                    transicoes[(origem, simbolo)].append(destino)
                 else:
-                    delta[(origin, symbol)] = [delta[(origin, symbol)], destination]
+                    transicoes[(origem, simbolo)] = [transicoes[(origem, simbolo)], destino]
 
-        return linhaEstados , linhaAlfabeto , delta, linhaEstadoInicial, linhaEstadoFinal 
-    except FileNotFoundError as exc:
-        raise FileNotFoundError("Arquivo não encontrado.") from exc
-    except Exception as e:
-        raise Exception(f"Erro ao carregar o autômato: {e}") from e
+        return estados, alfabeto, transicoes, estado_inicial, estados_finais
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Arquivo {filename} não encontrado.") from e
 
 
 def process(
-    automato: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]],
+    automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]],
     words: List[str]
 ) -> Dict[str, str]:
- 
-    _, sigma, _, _, _ = automato
-    dfa = convert_to_dfa(automato)
-    _, _, dfa_delta, dfa_q0, dfa_final = dfa
-    results = {}
+    """
+    Processa automato.
+    """
+    _, sigma, _, _, _ = automata
+    dfa = convert_to_dfa(automata)
+    _, _, dfa_transicao, dfa_inicial, dfa_final = dfa
 
-    for word in words:
-        current_state = dfa_q0
-        valid = True
-        for symbol in word:
-            if symbol not in sigma and symbol != '&':
-                results[word] = "INVALIDA"
-                valid = False
-                break
-            if (current_state, symbol) in dfa_delta:
-                current_state = dfa_delta[(current_state, symbol)]
-            else:
-                results[word] = "REJEITA"
-                valid = False
-                break
-        if valid:
-            if current_state in dfa_final:
-                results[word] = "ACEITA"
-            else:
-                results[word] = "REJEITA"
-    return results
+    verifica = {}
+    try:
+        for word in words:
+            estado_atual = dfa_inicial
+            verificacao = True
+
+            for simbolo in word:
+                if simbolo not in sigma and simbolo != '&':
+                    verifica[word] = "INVALIDA"
+                    verificacao = False
+                    break
+
+                if (estado_atual, simbolo) in dfa_transicao:
+                    estado_atual = dfa_transicao[(estado_atual, simbolo)]
+                else:
+                    verifica[word] = "REJEITA"
+                    verificacao = False
+                    break
+
+            if verificacao:
+                if estado_atual in dfa_final:
+                    verifica[word] = "ACEITA"
+                else:
+                    verifica[word] = "REJEITA"
+
+    except Exception as e:
+        raise ErroException(f"Erro ao processar palavra '{word}': {e}.") from e
+
+    return verifica
 
 
 def epsilon_closure(
-    state: str, delta: Dict[Tuple[str, str], Union[str, List[str]]]
+    estado: str, transicao: Dict[Tuple[str, str], Union[str, List[str]]]
 ) -> Set[str]:
-  
-    closure = {state}
-    stack = [state]
-    while stack:
-        current_state = stack.pop()
-        if (current_state, '&') in delta:
-            destinations = delta[(current_state, '&')]
-            if isinstance(destinations, str):
-                destinations = [destinations]
-            for dest in destinations:
+    """
+    Process epsilon_closure.
+    """
+    closure = {estado}
+    pilha = [estado]
+
+    while pilha:
+        estado_atual = pilha.pop()
+        if (estado_atual, '&') in transicao:
+            destinos = transicao[(estado_atual, '&')]
+            if isinstance(destinos, str):
+                destinos = [destinos]
+            for dest in destinos:
                 if dest not in closure:
                     closure.add(dest)
-                    stack.append(dest)
+                    pilha.append(dest)
     return closure
 
 
 def convert_to_dfa(
-    automato: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]]
+    automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]]
 ) -> Tuple[Set[str], Set[str], Dict[Tuple[str, str], str], str, Set[str]]:
-  
-    _, sigma, delta, q0, final_states = automato
+    """
+    Processa conversão.
+    """
+    _, sigma, dfa_transicao, dfa_inicial, dfa_final = automata
 
-    new_states = set()
-    new_delta = {}
-    unprocessed_states = [frozenset(epsilon_closure(q0, delta))]
-    state_mapping = {frozenset(epsilon_closure(q0, delta)): 'S0'}
-    new_q0 = 'S0'
-    new_final_states = set()
-    state_counter = 1
+    estados_novos = set()
+    nova_transicao = {}
+    nao_processado = [frozenset(epsilon_closure(dfa_inicial, dfa_transicao))]
+    mapeamento = {frozenset(epsilon_closure(dfa_inicial, dfa_transicao)): 'S0'}
+    novo_inicial = 'S0'
+    novo_estado_final = set()
+    contador = 1
 
-    while unprocessed_states:
-        current_subset = unprocessed_states.pop()
-        current_state_name = state_mapping[current_subset]
+    while nao_processado:
+        subset_atual = nao_processado.pop()
+        novo_estado_atual = mapeamento[subset_atual]
 
-        if not current_subset.isdisjoint(final_states):
-            new_final_states.add(current_state_name)
+        if not subset_atual.isdisjoint(dfa_final):
+            novo_estado_final.add(novo_estado_atual)
 
-        new_states.add(current_state_name)
+        estados_novos.add(novo_estado_atual)
 
-        for symbol in sigma:
-            next_subset = frozenset(
-                dest for state in current_subset
-                if (state, symbol) in delta
+        for simbolo in sigma:
+            proximo = frozenset(
+                dest for state in subset_atual
+                if (state, simbolo) in dfa_transicao
                 for dest in (
-                    delta[(state, symbol)]
-                    if isinstance(delta[(state, symbol)], list)
-                    else [delta[(state, symbol)]]
+                    dfa_transicao[(state, simbolo)]
+                    if isinstance(dfa_transicao[(state, simbolo)], list)
+                    else [dfa_transicao[(state, simbolo)]]
                 )
-                for dest in epsilon_closure(dest, delta)
+                for dest in epsilon_closure(dest, dfa_transicao)
             )
 
-            if next_subset:
-                if next_subset not in state_mapping:
-                    state_mapping[next_subset] = f'S{state_counter}'
-                    unprocessed_states.append(next_subset)
-                    state_counter += 1
+            if proximo:
+                if proximo not in mapeamento:
+                    mapeamento[proximo] = f'S{contador}'
+                    nao_processado.append(proximo)
+                    contador += 1
 
-                new_delta[(current_state_name, symbol)] = state_mapping[next_subset]
+                nova_transicao[(novo_estado_atual, simbolo)] = mapeamento[proximo]
 
-    return new_states, sigma, new_delta, new_q0, new_final_states
-
-
-if __name__ == "__main__":
-    current_directory = os.path.dirname(__file__)
-    absolute_path = os.path.join(current_directory, "../examples/06-nfa.txt")
-
-    automato = load_automata(absolute_path)
-    automato_dfa = convert_to_dfa(automato)
-
-    words = ["a", "b", "ab", "abb", "aabb", "abab", "baba", "bbaa", "bbbabaaa", "bbabbaa"]
-    results = process(automato_dfa, words)
-
-    print("Resultados no DFA:")
-    for word, result in results.items():
-        print(f"{word}:{result}", end= ', ')
-
-
-
+    return estados_novos, sigma, nova_transicao, novo_inicial, novo_estado_final

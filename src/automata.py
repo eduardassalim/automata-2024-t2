@@ -69,9 +69,7 @@ def process(
     automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]],
     words: List[str]
 ) -> Dict[str, str]:
-    """
-    Processa automato.
-    """
+    """ Processa automato. """
     _, sigma, _, _, _ = automata
     dfa = convert_to_dfa(automata)
     _, _, dfa_transicao, dfa_inicial, dfa_final = dfa
@@ -110,9 +108,7 @@ def process(
 def epsilon_closure(
     estado: str, transicao: Dict[Tuple[str, str], Union[str, List[str]]]
 ) -> Set[str]:
-    """
-    Process epsilon_closure.
-    """
+    """ Process epsilon_closure. """
     closure = {estado}
     pilha = [estado]
 
@@ -132,9 +128,7 @@ def epsilon_closure(
 def convert_to_dfa(
     automata: Tuple[Set[str], Set[str], Dict[Tuple[str, str], Union[str, List[str]]], str, Set[str]]
 ) -> Tuple[Set[str], Set[str], Dict[Tuple[str, str], str], str, Set[str]]:
-    """
-    Processa conversão.
-    """
+    """ Processa conversão. """
     _, sigma, dfa_transicao, dfa_inicial, dfa_final = automata
 
     estados_novos = set()
